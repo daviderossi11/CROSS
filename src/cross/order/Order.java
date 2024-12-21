@@ -5,12 +5,14 @@ public abstract class Order {
     private final String type; // ask or bid
     private final int size;
     private final long timestamp;
+    private OrderStatus status;
 
     public Order(int orderId, String type, int size) {
         this.orderId = orderId;
         this.type = type;
         this.size = size;
         this.timestamp = System.currentTimeMillis();
+        this.status = OrderStatus.PENDING;
     }
 
     public int getOrderId() {
@@ -27,6 +29,14 @@ public abstract class Order {
 
     public long getTimestamp() {
         return timestamp;
+    }
+
+    public OrderStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(OrderStatus status) {
+        this.status = status;
     }
 
     public abstract boolean processOrder();
