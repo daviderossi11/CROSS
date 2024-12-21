@@ -1,128 +1,95 @@
 package cross.order;
 
 import java.util.*;
-import java.time.*;
-import java.io.*;
-import com.google.gson.*;
-import com.google.gson.GsonBuilder;
-
+import java.util.concurrent.*;
 
 public class OrderBook {
-    private final List<LimitOrder> bidOrders;
-    private final List<LimitOrder> askOrders;
-    private final List<StopOrder> stopOrders;
 
+    // Liste threadsafe per bid e ask
+    private final PriorityBlockingQueue<LimitOrder> bidOrders;
+    private final PriorityBlockingQueue<LimitOrder> askOrders;
+
+    // Lista per MarketOrder
+    private final BlockingQueue<MarketOrder> marketOrders;
+
+    // Prezzo attuale threadsafe
+    private final AtomicInteger currentPrice;
+
+    // Costruttore
     public OrderBook() {
-        this.bidOrders = Collections.synchronizedList(new ArrayList<>());
-        this.askOrders = Collections.synchronizedList(new ArrayList<>());
-        this.stopOrders = Collections.synchronizedList(new ArrayList<>());
+        this.bidOrders = new PriorityBlockingQueue<>(
+            100, Comparator.comparing(LimitOrder::getLimitPrice).reversed()
+                           .thenComparing(LimitOrder::getTimestamp)
+        );
+        this.askOrders = new PriorityBlockingQueue<>(
+            100, Comparator.comparing(LimitOrder::getLimitPrice)
+                           .thenComparing(LimitOrder::getTimestamp)
+        );
+        this.marketOrders = new LinkedBlockingQueue<>();
+        this.currentPrice = new AtomicInteger(0);
     }
 
-    // Aggiunge un ordine all'order book
+    // Aggiunta ordini
     public synchronized void addOrder(Order order) {
-        order.setStatus(OrderStatus.PENDING);
-        if (order instanceof LimitOrder) {
-            switch (order) {
-                case LimitOrder limitOrder -> addLimitOrder(limitOrder);
-                case StopOrder stopOrder -> stopOrders.add(stopOrder);
-                case MarketOrder marketOrder -> processMarketOrder(marketOrder);
-                default -> throw new IllegalArgumentException("Unknown order type");
+        if (order instanceof LimitOrder limitOrder) {
+            if (limitOrder.getType().equals("bid")) {
+                bidOrders.add(limitOrder);
+            } else {
+                askOrders.add(limitOrder);
+            }
+        } else if (order instanceof MarketOrder marketOrder) {
+            processMarketOrder(marketOrder);
+        }
+    }
+
+    // Processa MarketOrder
+    private synchronized void processMarketOrder(MarketOrder order) {
+        if (order.getType().equals("bid")) {
+            matchOrders(order, askOrders);
+        } else {
+            matchOrders(order, bidOrders);
+        }
+    }
+
+    // Matching Orders
+    private synchronized void matchOrders(Order order, PriorityBlockingQueue<LimitOrder> orders) {
+        int remainingSize = order.getSize();
+
+        while (!orders.isEmpty() && remainingSize > 0) {
+            LimitOrder limitOrder = orders.peek();
+
+            boolean priceMatch = (order.getType().equals("bid") && limitOrder.getLimitPrice() <= currentPrice.get()) ||
+                                 (order.getType().equals("ask") && limitOrder.getLimitPrice() >= currentPrice.get());
+
+            if (priceMatch) {
+                if (remainingSize >= limitOrder.getSize()) {
+                    remainingSize -= limitOrder.getSize();
+                    orders.poll();
+                } else {
+                    int newSize = limitOrder.getSize() - remainingSize;
+                    orders.poll();
+                    orders.add(new LimitOrder(limitOrder.getType(), newSize, limitOrder.getLimitPrice()));
+                    remainingSize = 0;
+                }
+            } else {
+                break;
             }
         }
     }
 
-    // Aggiunge un LimitOrder con ordinamento
-    private synchronized void addLimitOrder(LimitOrder order) {
-        if (order.getType().equals("bid")) {
-            bidOrders.add(order);
-            bidOrders.sort(Comparator.comparing(LimitOrder::getLimitPrice).reversed()
-                                     .thenComparing(LimitOrder::getTimestamp));
-        } else {
-            askOrders.add(order);
-            askOrders.sort(Comparator.comparing(LimitOrder::getLimitPrice)
-                                     .thenComparing(LimitOrder::getTimestamp));
-        }
+    // Metodo per aggiornare il prezzo corrente
+    public synchronized void updateCurrentPrice(int price) {
+        currentPrice.set(price);
     }
 
-    // Cancella un ordine specifico
-    public synchronized void cancelOrder(int orderId) {
-        bidOrders.removeIf(order -> {
-            boolean match = order.getOrderId() == orderId;
-            if (match) order.setStatus(OrderStatus.CANCELLED);
-            return match;
-        });
-        askOrders.removeIf(order -> {
-            boolean match = order.getOrderId() == orderId;
-            if (match) order.setStatus(OrderStatus.CANCELLED);
-            return match;
-        });
-        stopOrders.removeIf(order -> {
-            boolean match = order.getOrderId() == orderId;
-            if (match) order.setStatus(OrderStatus.CANCELLED);
-            return match;
-        });
-    }
-
-    // Elabora un MarketOrder
-    public synchronized void processMarketOrder(MarketOrder order) {
-        if (order.getType().equals("bid")) {
-            MatchingAlgorithm.matchOrder(order, askOrders);
-        } else {
-            MatchingAlgorithm.matchOrder(order, bidOrders);
-        }
-    }
-
-    // Elabora gli StopOrder
-    public synchronized void processStopOrders(int marketPrice) {
-        Iterator<StopOrder> iterator = stopOrders.iterator();
-        while (iterator.hasNext()) {
-            StopOrder stopOrder = iterator.next();
-            if ((stopOrder.getType().equals("bid") && marketPrice >= stopOrder.getStopPrice()) ||
-                (stopOrder.getType().equals("ask") && marketPrice <= stopOrder.getStopPrice())) {
-                processMarketOrder(new MarketOrder(stopOrder.getOrderId(), stopOrder.getType(), stopOrder.getSize()));
-                stopOrder.setStatus(OrderStatus.FILLED);
-                iterator.remove();
-            }
-        }
-    }
-
-    // Stampa lo stato attuale dell'order book
+    // Stampa lo stato dell'OrderBook
     public synchronized void printOrderBook() {
         System.out.println("BID Orders:");
-        bidOrders.forEach(o -> System.out.println(o.getLimitPrice() + " - " + o.getSize() + " - " + o.getStatus()));
+        bidOrders.forEach(o -> System.out.println(o.getLimitPrice() + " - " + o.getSize()));
 
         System.out.println("ASK Orders:");
-        askOrders.forEach(o -> System.out.println(o.getLimitPrice() + " - " + o.getSize() + " - " + o.getStatus()));
-    }
+        askOrders.forEach(o -> System.out.println(o.getLimitPrice() + " - " + o.getSize()));
 
-    // Genera un file JSON con lo storico degli ordini di un determinato mese
-    public synchronized void exportOrderHistoryByMonth(int year, int month, String filePath) {
-        List<Order> filteredOrders = new ArrayList<>();
-
-        bidOrders.stream()
-                .filter(o -> isOrderInMonth(o.getTimestamp(), year, month))
-                .forEach(filteredOrders::add);
-
-        askOrders.stream()
-                .filter(o -> isOrderInMonth(o.getTimestamp(), year, month))
-                .forEach(filteredOrders::add);
-
-        stopOrders.stream()
-                .filter(o -> isOrderInMonth(o.getTimestamp(), year, month))
-                .forEach(filteredOrders::add);
-
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (Writer writer = new FileWriter(filePath)) {
-            gson.toJson(filteredOrders, writer);
-        } catch (IOException e) {
-            System.err.println("Error writing to file: " + e.getMessage());
-        }
-    }
-
-    private boolean isOrderInMonth(long timestamp, int year, int month) {
-        Instant instant = Instant.ofEpochMilli(timestamp);
-        LocalDateTime dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
-        return dateTime.getYear() == year && dateTime.getMonthValue() == month;
+        System.out.println("Market Price: " + currentPrice.get());
     }
 }
-
