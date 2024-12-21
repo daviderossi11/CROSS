@@ -12,10 +12,5 @@ public class StopOrder extends Order {
         return stopPrice;
     }
 
-    @Override
-    public boolean processOrder() {
-        // process stop order
-        return true;
-    }
-    
+
 }
