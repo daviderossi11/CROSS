@@ -3,8 +3,8 @@ package cross.order;
 public class LimitOrder extends Order{
     private final int limitPrice;
 
-    public LimitOrder(int orderID, String type, int size, int limitPrice) {
-        super(orderID, type, size);
+    public LimitOrder(String type, int size, int limitPrice) {
+        super(type, size);
         this.limitPrice = limitPrice;
     }
 
@@ -12,11 +12,5 @@ public class LimitOrder extends Order{
         return limitPrice;
     }
 
-
-    @Override
-    public boolean processOrder() {
-        // process limit order
-        return true;
-    }
     
 }

@@ -3,8 +3,8 @@ package cross.order;
 public class StopOrder extends Order {
     private final int stopPrice;
 
-    public StopOrder(int orderId, String type, int size, int stopPrice) {
-        super(orderId, type, size);
+    public StopOrder(String type, int size, int stopPrice) {
+        super(type, size);
         this.stopPrice = stopPrice;
     }
 
