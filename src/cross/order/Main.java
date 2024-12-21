@@ -1,40 +1,32 @@
 package cross.order;
 
-import java.time.*;
-
 public class Main {
     public static void main(String[] args) {
         // Creazione dell'OrderBook
         OrderBook orderBook = new OrderBook();
 
-        // Aggiunta di ordini di esempio
-        LimitOrder order1 = new LimitOrder(1, "bid", 10, 50000);
-        LimitOrder order2 = new LimitOrder(2, "ask", 5, 51000);
-        LimitOrder order3 = new LimitOrder(3, "bid", 15, 50500);
-        StopOrder stopOrder1 = new StopOrder(4, "bid", 10, 49500);
-        StopOrder stopOrder2 = new StopOrder(5, "ask", 8, 51500);
+        // Creazione di alcuni ordini
+        LimitOrder limitOrder1 = new LimitOrder("bid", 100, 100000);
+        LimitOrder limitOrder2 = new LimitOrder("ask", 100, 200000);
+        MarketOrder marketOrder1 = new MarketOrder("bid", 50);
+        MarketOrder marketOrder2 = new MarketOrder("ask", 50);
+        LimitOrder limitOrder3 = new LimitOrder("bid", 100, 150000);
+        LimitOrder limitOrder4 = new LimitOrder("ask", 100, 250000);
+        MarketOrder marketOrder3 = new MarketOrder("bid", 50);
+        MarketOrder marketOrder4 = new MarketOrder("ask", 50);
 
-        orderBook.addOrder(order1);
-        orderBook.addOrder(order2);
-        orderBook.addOrder(order3);
-        orderBook.addOrder(stopOrder1);
-        orderBook.addOrder(stopOrder2);
+        // Aggiunta degli ordini all'OrderBook
+        orderBook.addOrder(limitOrder1);
+        orderBook.addOrder(limitOrder2);
+        orderBook.addOrder(marketOrder1);
+        orderBook.addOrder(marketOrder2);
+        orderBook.addOrder(limitOrder3);
+        orderBook.addOrder(limitOrder4);
+        orderBook.addOrder(marketOrder3);
+        orderBook.addOrder(marketOrder4);
 
-        // Simulazione di un market order
-        MarketOrder marketOrder = new MarketOrder(6, "bid", 12);
-        orderBook.processMarketOrder(marketOrder);
-
-        // Stampa lo stato attuale dell'order book
-        System.out.println("Stato attuale dell'OrderBook:");
+        // Stampa dell'OrderBook
         orderBook.printOrderBook();
 
-        // Esporta lo storico degli ordini per il mese corrente
-        LocalDateTime now = LocalDateTime.now();
-        int year = now.getYear();
-        int month = now.getMonthValue();
-
-        String filePath = "storicoOrdini.json";
-        orderBook.exportOrderHistoryByMonth(year, month, filePath);
-        System.out.println("Storico ordini esportato in: " + filePath);
-    }
+        }
 }

@@ -2,15 +2,14 @@ package cross.order;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
 
 public class OrderBook {
 
     // Liste threadsafe per bid e ask
     private final PriorityBlockingQueue<LimitOrder> bidOrders;
     private final PriorityBlockingQueue<LimitOrder> askOrders;
-
-    // Lista per MarketOrder
-    private final BlockingQueue<MarketOrder> marketOrders;
 
     // Prezzo attuale threadsafe
     private final AtomicInteger currentPrice;
@@ -25,20 +24,22 @@ public class OrderBook {
             100, Comparator.comparing(LimitOrder::getLimitPrice)
                            .thenComparing(LimitOrder::getTimestamp)
         );
-        this.marketOrders = new LinkedBlockingQueue<>();
         this.currentPrice = new AtomicInteger(0);
     }
 
+
     // Aggiunta ordini
     public synchronized void addOrder(Order order) {
-        if (order instanceof LimitOrder limitOrder) {
-            if (limitOrder.getType().equals("bid")) {
-                bidOrders.add(limitOrder);
-            } else {
-                askOrders.add(limitOrder);
+        switch (order) {
+            case LimitOrder limitOrder -> {
+                if (limitOrder.getType().equals("bid")) {
+                    bidOrders.add(limitOrder);
+                } else {
+                    askOrders.add(limitOrder);
+                }
             }
-        } else if (order instanceof MarketOrder marketOrder) {
-            processMarketOrder(marketOrder);
+            case MarketOrder marketOrder -> processMarketOrder(marketOrder);
+            default -> throw new IllegalArgumentException("Unknown order type");
         }
     }
 
@@ -54,8 +55,10 @@ public class OrderBook {
     // Matching Orders
     private synchronized void matchOrders(Order order, PriorityBlockingQueue<LimitOrder> orders) {
         int remainingSize = order.getSize();
+        List<LimitOrder> temp = new ArrayList<>();
 
         while (!orders.isEmpty() && remainingSize > 0) {
+
             LimitOrder limitOrder = orders.peek();
 
             boolean priceMatch = (order.getType().equals("bid") && limitOrder.getLimitPrice() <= currentPrice.get()) ||
@@ -64,16 +67,25 @@ public class OrderBook {
             if (priceMatch) {
                 if (remainingSize >= limitOrder.getSize()) {
                     remainingSize -= limitOrder.getSize();
-                    orders.poll();
+                    temp.add(orders.poll());
+                    
                 } else {
                     int newSize = limitOrder.getSize() - remainingSize;
-                    orders.poll();
+                    temp.add(orders.poll());
                     orders.add(new LimitOrder(limitOrder.getType(), newSize, limitOrder.getLimitPrice()));
                     remainingSize = 0;
                 }
             } else {
+                System.out.println("No match found for " + order.getOrderId());
                 break;
             }
+        }
+
+        if (!temp.isEmpty()) {
+            int price = temp.stream().mapToInt(LimitOrder::getLimitPrice).max().orElse(currentPrice.get());
+            updateCurrentPrice(price);
+            System.out.println("Matched " + order.getOrderId() + " with");
+            temp.forEach(o -> System.out.println(o.getOrderId()));
         }
     }
 
@@ -85,10 +97,10 @@ public class OrderBook {
     // Stampa lo stato dell'OrderBook
     public synchronized void printOrderBook() {
         System.out.println("BID Orders:");
-        bidOrders.forEach(o -> System.out.println(o.getLimitPrice() + " - " + o.getSize()));
-
+        bidOrders.forEach(o -> System.out.println(o.getOrderId() + " - "+ o.getLimitPrice() + " - " + o.getSize()));
+        
         System.out.println("ASK Orders:");
-        askOrders.forEach(o -> System.out.println(o.getLimitPrice() + " - " + o.getSize()));
+        askOrders.forEach(o -> System.out.println(o.getOrderId() + " - "+ o.getLimitPrice() + " - " + o.getSize()));
 
         System.out.println("Market Price: " + currentPrice.get());
     }
