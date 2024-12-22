@@ -42,104 +42,70 @@ public class ConnectionHandler implements Runnable {
                 JsonObject response = new JsonObject();
 
                 switch (action) {
-                    case "login":
+                    case "login" -> {
                         String username = jsonRequest.get("username").getAsString();
                         String password = jsonRequest.get("password").getAsString();
                         int responseCode = userManagement.login(username, password);
                         response.addProperty("code", responseCode);
                         switch (responseCode) {
-                            case 100:
+                            case 100 -> {
                                 user = userManagement.getUser(username);
                                 response.addProperty("message", "Login successful");
-                                break;
-                            case 101:
-                                response.addProperty("message", "username/password mismatch or user does not exist");
-                                break;
-                            case 102:
-                                response.addProperty("message", "User already logged in");
-                                break;
-                            default:
-                                response.addProperty("message", "other error cases");
-                                break;
+                            }
+                            case 101 -> response.addProperty("message", "username/password mismatch or user does not exist");
+                            case 102 -> response.addProperty("message", "User already logged in");
+                            default -> response.addProperty("message", "other error cases");
                         }
-                        break;
-
-                    case "logout":
+                    }
+                    case "logout" -> {
                         int logoutResponse = userManagement.logout(user.getUserId());
                         response.addProperty("code", logoutResponse);
                         switch (logoutResponse) {
-                            case 100:
-                                response.addProperty("message", "Logout successful");
-                                break;
-                            default:
-                                response.addProperty("message", "username/connection mismatch or not logged in");    
-                                break;
+                            case 100 -> response.addProperty("message", "Logout successful");
+                            default -> response.addProperty("message", "username/connection mismatch or not logged in");
                         }
-                        break;
-
-                    case "register":
-                        username = jsonRequest.get("username").getAsString();
-                        password = jsonRequest.get("password").getAsString();
+                    }
+                    case "register" -> {
+                        String username = jsonRequest.get("username").getAsString();
+                        String password = jsonRequest.get("password").getAsString();
                         int registerResponse = userManagement.register(username, password);
                         response.addProperty("code", registerResponse);
                         switch (registerResponse) {
-                            case 100:
-                                response.addProperty("message", "OK");
-                                break;
-                            case 101:
-                                response.addProperty("message", "Username already exists");
-                                break;
-                            case 102:
-                                response.addProperty("message", "invalid password");
-                                break;
-                            default:
-                                response.addProperty("message", "Other error cases");
-                                break;
+                            case 100 -> response.addProperty("message", "OK");
+                            case 101 -> response.addProperty("message", "Username already exists");
+                            case 102 -> response.addProperty("message", "invalid password");
+                            default -> response.addProperty("message", "Other error cases");
                         }
-                        break;
-                    
-
-                    case "updateCredentials":
-                        username = jsonRequest.get("username").getAsString();
+                    }
+                    case "updateCredentials" -> {
+                        String username = jsonRequest.get("username").getAsString();
                         String oldPassword = jsonRequest.get("old_password").getAsString();
                         String newPassword = jsonRequest.get("new_password").getAsString();
                         int updateResponse = userManagement.updateCredentials(username, oldPassword, newPassword);
                         response.addProperty("code", updateResponse);
                         switch (updateResponse) {
-                            case 100:
-                                response.addProperty("message", "OK");
-                                break;
-                            case 101:
-                                response.addProperty("message", "invalid new password");
-                                break;
-                            case 102:
-                                response.addProperty("message", "usernmae/old_password mismatch");
-                                break;
-                            case 103:
-                                response.addProperty("message", "new password same as old password");
-                                break;
-                            case 104:
-                                response.addProperty("message", "user currently logged in");    
-                                break;
-                            default:
-                                response.addProperty("message", "Other error cases");
-                                break;
+                            case 100 -> response.addProperty("message", "OK");
+                            case 101 -> response.addProperty("message", "invalid new password");
+                            case 102 -> response.addProperty("message", "usernmae/old_password mismatch");
+                            case 103 -> response.addProperty("message", "new password same as old password");
+                            case 104 -> response.addProperty("message", "user currently logged in");
+                            default -> response.addProperty("message", "Other error cases");
                         }
-                        break;
-                    default:
+                    }
+                    default -> {
                         response.addProperty("code", 400);
                         response.addProperty("message", "Unknown action");
-                        break;
+                    }
                 }
                 out.println(gson.toJson(response));
             }
         } catch(IOException e){
-            System.err.println("Error handling connection: " + e.getMessage());
+            System.err.println("Error: " + e);
         } finally {
             try {
                 socket.close();
             } catch (IOException e) {
-                System.err.println("Error closing socket: " + e.getMessage());
+                System.err.println("Error: " + e);
             }
         }
     }

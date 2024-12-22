@@ -4,7 +4,6 @@ import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class ClientMain {
@@ -71,12 +70,15 @@ public class ClientMain {
 
                 out.println(gson.toJson(request));
                 String response = in.readLine();
-
-                System.out.println("Status: " + jsonResponse.get("status").getAsString() + ", Message: " + jsonResponse.get("message").getAsString());   
+                JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+                System.out.println(jsonResponse.get("status").getAsString() + " - " + jsonResponse.get("message").getAsString());
             }
 
         } catch (IOException e) {
             System.err.println("Error: " + e);
         }
     }
+
+    }
+
 }
