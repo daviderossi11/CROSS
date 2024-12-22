@@ -76,19 +76,25 @@ public class UserManagement{
         }
     }
 
-    public int changePassword(int userId, String oldPassword, String newPassword){
+    public int updateCredentials(String username, String oldPassword, String newPassword){
         try{
-            User user = loggedInUsers.stream().filter(u -> u.getUserId() == userId).findFirst().orElse(null);
+            User user = users.stream().filter(u -> u.getUsername().equals(username)).findFirst().orElse(null);
             if(user == null || !user.checkPassword(oldPassword)){
+                return 102;
+            }
+            if(loggedInUsers.stream().anyMatch(u -> u.getUserId() == user.getUserId())){
+                return 104;
+            }
+            if(newPassword.length() < 8){
                 return 101;
             }
-            if(newPassword.length() < 8 || user.checkPassword(newPassword)){
+            if(user.checkPassword(newPassword)){
                 return 103;
             }
             user.changePassword(newPassword);
             return 100;
         }catch(Exception e){
-            return 104;
+            return 105;
         }
     }
 

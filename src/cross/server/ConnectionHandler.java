@@ -36,7 +36,8 @@ public class ConnectionHandler implements Runnable {
                 String request = in.readLine();
                 if (request == null) break;
 
-                JsonObject jsonRequest = gson.fromJson(request, JsonObject.class);
+                JsonElement jsonElement = JsonParser.parseString(request);
+                JsonObject jsonRequest = jsonElement.getAsJsonObject();
                 String action = jsonRequest.get("action").getAsString();
                 JsonObject response = new JsonObject();
 
@@ -96,7 +97,35 @@ public class ConnectionHandler implements Runnable {
                                 break;
                         }
                         break;
+                    
 
+                    case "updateCredentials":
+                        username = jsonRequest.get("username").getAsString();
+                        String oldPassword = jsonRequest.get("old_password").getAsString();
+                        String newPassword = jsonRequest.get("new_password").getAsString();
+                        int updateResponse = userManagement.updateCredentials(username, oldPassword, newPassword);
+                        response.addProperty("code", updateResponse);
+                        switch (updateResponse) {
+                            case 100:
+                                response.addProperty("message", "OK");
+                                break;
+                            case 101:
+                                response.addProperty("message", "invalid new password");
+                                break;
+                            case 102:
+                                response.addProperty("message", "usernmae/old_password mismatch");
+                                break;
+                            case 103:
+                                response.addProperty("message", "new password same as old password");
+                                break;
+                            case 104:
+                                response.addProperty("message", "user currently logged in");    
+                                break;
+                            default:
+                                response.addProperty("message", "Other error cases");
+                                break;
+                        }
+                        break;
                     default:
                         response.addProperty("code", 400);
                         response.addProperty("message", "Unknown action");
@@ -105,12 +134,12 @@ public class ConnectionHandler implements Runnable {
                 out.println(gson.toJson(response));
             }
         } catch(IOException e){
-            e.printStackTrace();
+            System.err.println("Error handling connection: " + e.getMessage());
         } finally {
             try {
                 socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                System.err.println("Error closing socket: " + e.getMessage());
             }
         }
     }
