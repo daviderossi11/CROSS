@@ -1,15 +1,14 @@
 package cross.user;
 
 import java.util.*;
-import java.util.concurrent.*;
 
 public class UserManagement{
     private final ArrayList<User> users;
-    private fina ArrayList<User> loggedInUsers;
+    private final ArrayList<User> loggedInUsers;
     
     public UserManagement(){
-        users = new ArrayList<User>();
-        loggedInUsers = new ArrayList<User>();
+        users = new ArrayList<>();
+        loggedInUsers = new ArrayList<>();
     }
 
     public void addUser(User user){
@@ -17,6 +16,14 @@ public class UserManagement{
             users.add(user);
         }catch(Exception e){
             System.out.println("Error: " + e);
+        }
+    }
+
+    public User getUser(String username){
+        try{
+            return loggedInUsers.stream().filter(user -> user.getUsername().equals(username)).findFirst().orElse(null);
+        }catch(Exception e){
+            return null;
         }
     }
 
@@ -75,7 +82,7 @@ public class UserManagement{
             if(user == null || !user.checkPassword(oldPassword)){
                 return 101;
             }
-            if(newPassword.length() < 8 || user.getPassword().equals(newPassword)){
+            if(newPassword.length() < 8 || user.checkPassword(newPassword)){
                 return 103;
             }
             user.changePassword(newPassword);

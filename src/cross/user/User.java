@@ -1,11 +1,12 @@
 package cross.user;
 
+
 public class User{
     private final int userId;
-    private string username;
-    private string password;
+    private final String username;
+    private String password;
 
-    public User(int userId, string username, string password){
+    public User(int userId, String username, String password){
         this.userId = userId;
         this.username = username;
         this.password = password;
@@ -15,20 +16,16 @@ public class User{
         return userId;
     }
 
-    public string getUsername(){
+    public String getUsername(){
         return username;
     }
 
-    public string checkPassword(string password){
+    public boolean checkPassword(String password){
         return this.password.equals(password);
     }
 
-    public void changePassword(string password){
+    public void changePassword(String password){
         this.password = password;
-    }
-
-    public void changeUsername(string username){
-        this.username = username;
     }
 
 
