@@ -1,12 +1,11 @@
 package cross.server;
 
+import java.io.*;
 import java.net.Socket;
-
+import com.google.gson.*;
 import cross.order.OrderBook;
 import cross.user.User;
 import cross.user.UserManagement;
-import java.io.PrintWriter;
-
 
 public class ConnectionHandler implements Runnable {
 
@@ -16,7 +15,6 @@ public class ConnectionHandler implements Runnable {
     private final UserManagement userManagement;
     private final OrderBook orderBook;
     private User user;
-
 
     public ConnectionHandler(Socket socket, UserManagement userManagement, OrderBook orderBook) {
         this.socket = socket;
@@ -30,24 +28,90 @@ public class ConnectionHandler implements Runnable {
         }
     }
 
-
     @Override
     public void run(){
-        while(socket.isConnected()){
-            try{
-                String username = in.readLine();
-                String password = in.readLine();
-                int response = userManagement.login(username, password);
-                if(response == 100){
-                    user = userManagement.getUser(username);
-                    out.println("Login successful");
-                }else{
-                    out.println("Login failed");
+        Gson gson = new Gson();
+        try {
+            while(socket.isConnected()){
+                String request = in.readLine();
+                if (request == null) break;
+
+                JsonObject jsonRequest = gson.fromJson(request, JsonObject.class);
+                String action = jsonRequest.get("action").getAsString();
+                JsonObject response = new JsonObject();
+
+                switch (action) {
+                    case "login":
+                        String username = jsonRequest.get("username").getAsString();
+                        String password = jsonRequest.get("password").getAsString();
+                        int responseCode = userManagement.login(username, password);
+                        response.addProperty("code", responseCode);
+                        switch (responseCode) {
+                            case 100:
+                                user = userManagement.getUser(username);
+                                response.addProperty("message", "Login successful");
+                                break;
+                            case 101:
+                                response.addProperty("message", "username/password mismatch or user does not exist");
+                                break;
+                            case 102:
+                                response.addProperty("message", "User already logged in");
+                                break;
+                            default:
+                                response.addProperty("message", "other error cases");
+                                break;
+                        }
+                        break;
+
+                    case "logout":
+                        int logoutResponse = userManagement.logout(user.getUserId());
+                        response.addProperty("code", logoutResponse);
+                        switch (logoutResponse) {
+                            case 100:
+                                response.addProperty("message", "Logout successful");
+                                break;
+                            default:
+                                response.addProperty("message", "username/connection mismatch or not logged in");    
+                                break;
+                        }
+                        break;
+
+                    case "register":
+                        username = jsonRequest.get("username").getAsString();
+                        password = jsonRequest.get("password").getAsString();
+                        int registerResponse = userManagement.register(username, password);
+                        response.addProperty("code", registerResponse);
+                        switch (registerResponse) {
+                            case 100:
+                                response.addProperty("message", "OK");
+                                break;
+                            case 101:
+                                response.addProperty("message", "Username already exists");
+                                break;
+                            case 102:
+                                response.addProperty("message", "invalid password");
+                                break;
+                            default:
+                                response.addProperty("message", "Other error cases");
+                                break;
+                        }
+                        break;
+
+                    default:
+                        response.addProperty("code", 400);
+                        response.addProperty("message", "Unknown action");
+                        break;
                 }
-            }catch(IOException e){
+                out.println(gson.toJson(response));
+            }
+        } catch(IOException e){
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-
     }
 }

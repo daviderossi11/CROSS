@@ -1,37 +1,75 @@
 package cross.client;
 
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
-import java.util.*;
+import java.util.Scanner;
+import com.google.gson.*;
 
 public class ClientMain {
-    
+
     public static void main(String[] args) {
-        Scanner scanner = null;
-        Scanner in = null;
+        Scanner scanner = new Scanner(System.in);
+        Gson gson = new Gson();
 
         try(Socket socket = new Socket("localhost", 1024)) {
-            scanner = new Scanner(System.in);
-            in = new Scanner(socket.getInputStream());
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
-            System.out.println("Enter your username: ");
-            String username = scanner.nextLine();
-            System.out.println("Enter your password: ");
-            String password = scanner.nextLine();
+            while (true) {
+                System.out.println("Choose action (register/login/logout) or type 'exit' to quit: ");
+                String action = scanner.nextLine();
 
-            out.println(username);
-            out.println(password);
+                if (action.equalsIgnoreCase("exit")) {
+                    System.out.println("Exiting client...");
+                    break;
+                }
 
-            String response = in.nextLine();
-            if(response.equals("Login successful")) {
-                System.out.println("Login successful");
-            } else {
-                System.out.println("Login failed");
+                JsonObject request = new JsonObject();
+
+                switch (action) {
+                    case "register":
+                        System.out.println("Enter username: ");
+                        String regUsername = scanner.nextLine();
+                        System.out.println("Enter password: ");
+                        String regPassword = scanner.nextLine();
+                        request.addProperty("action", "register");
+                        request.addProperty("username", regUsername);
+                        request.addProperty("password", regPassword);
+                        break;
+
+                    case "login":
+                        System.out.println("Enter username: ");
+                        String logUsername = scanner.nextLine();
+                        System.out.println("Enter password: ");
+                        String logPassword = scanner.nextLine();
+                        request.addProperty("action", "login");
+                        request.addProperty("username", logUsername);
+                        request.addProperty("password", logPassword);
+                        break;
+
+                    case "logout":
+                        System.out.println("Enter user ID: ");
+                        int userId = scanner.nextInt();
+                        scanner.nextLine(); // consume newline
+                        request.addProperty("action", "logout");
+                        request.addProperty("userId", userId);
+                        break;
+
+                    default:
+                        System.out.println("Invalid action");
+                        continue;
+                }
+
+                out.println(gson.toJson(request));
+
+                String response = in.readLine();
+                JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+
+                System.out.println("Status: " + jsonResponse.get("status").getAsString() + ", Message: " + jsonResponse.get("message").getAsString());   
             }
+
         } catch (IOException e) {
             e.printStackTrace();
+        }
     }
-    
 }
