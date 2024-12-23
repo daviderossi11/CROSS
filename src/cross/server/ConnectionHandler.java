@@ -6,6 +6,7 @@ import com.google.gson.*;
 import cross.order.OrderBook;
 import cross.user.User;
 import cross.user.UserManagement;
+import cross.util.Session;
 
 public class ConnectionHandler implements Runnable {
 
@@ -15,6 +16,7 @@ public class ConnectionHandler implements Runnable {
     private final UserManagement userManagement;
     private final OrderBook orderBook;
     private User user;
+    private Session session;
 
     public ConnectionHandler(Socket socket, UserManagement userManagement, OrderBook orderBook) {
         this.socket = socket;
@@ -50,6 +52,7 @@ public class ConnectionHandler implements Runnable {
                         switch (responseCode) {
                             case 100 -> {
                                 user = userManagement.getUser(username);
+                                session = new Session(user.getUserId(), socket.getInetAddress());
                                 response.addProperty("message", "Login successful");
                             }
                             case 101 -> response.addProperty("message", "username/password mismatch or user does not exist");
