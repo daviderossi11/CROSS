@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 public class StoricoOrdini {
     private final String FILE_PATH = "src/cross/db/storicoOrdini.json";
-    private List<Order> trades;
+    private final List<Order> trades;
     private final Gson gson;
 
     public StoricoOrdini() {
@@ -23,13 +23,28 @@ public class StoricoOrdini {
             JsonElement jsonElement = JsonParser.parseReader(reader).getAsJsonObject();
             JsonObject jsonObject = jsonElement.getAsJsonObject();
             JsonArray jsonArray = jsonObject.getAsJsonArray("trades");
-            this.trades = gson.fromJson(jsonArray, new TypeToken<List<Order>>(){}.getType());
+            jsonArray.forEach(jsonElement1 -> {
+                Order trade = gson.fromJson(jsonElement1, Order.class);
+                trades.add(trade);
+            });
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    public int getLastPrice() {
+        synchronized (trades){
+            if (trades.isEmpty()) return 0;
+            return trades.get(trades.size() - 1).getPrice();
+        }
+    }
 
+    public int getOrderid() {
+        synchronized (trades){
+            if (trades.isEmpty()) return 1;
+            return trades.get(trades.size() - 1).getOrderId();
+        }
+    }
 
     public void addTrade(List<Order> trade) {
         this.trades.addAll(trade);

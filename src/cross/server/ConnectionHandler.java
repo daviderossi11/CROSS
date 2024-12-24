@@ -7,7 +7,12 @@ import cross.user.User;
 import cross.user.UserManagement;
 import cross.util.Session;
 
+import java.util.concurrent.atomic.*;
+
 public class ConnectionHandler implements Runnable {
+    
+    private static AtomicInteger orderId;
+    private static AtomicInteger price;
 
     private final Socket socket;
     private final BufferedReader in;
@@ -16,10 +21,11 @@ public class ConnectionHandler implements Runnable {
     private User user;
     private Session session;
 
-    public ConnectionHandler(Socket socket, UserManagement userManagement, OrderBook orderBook) {
+    public ConnectionHandler(Socket socket, UserManagement userManagement, AtomicInteger price, AtomicInteger orderId) { 
         this.socket = socket;
         this.userManagement = userManagement;
-        this.orderBook = orderBook;
+        this.price = price;
+        this.orderId = orderId;
         try {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
