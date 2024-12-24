@@ -3,27 +3,33 @@ package cross.server;
 import java.io.*;
 import java.net.Socket;
 import com.google.gson.*;
-import cross.user.User;
-import cross.user.UserManagement;
-import cross.util.Session;
+import cross.order.*;
+import cross.user.*;
+import cross.util.*;
 
 import java.util.concurrent.atomic.*;
 
 public class ConnectionHandler implements Runnable {
     
-    private static AtomicInteger orderId;
-    private static AtomicInteger price;
+    private AtomicInteger orderId;
+    private AtomicInteger price;
 
     private final Socket socket;
     private final BufferedReader in;
     private final PrintWriter out;
     private final UserManagement userManagement;
+    private final OrderBook orderBook;
+    private final CheckStopOrder checkStopOrder;
+    private final StoricoOrdini storicoOrdini;
     private User user;
     private Session session;
 
-    public ConnectionHandler(Socket socket, UserManagement userManagement, AtomicInteger price, AtomicInteger orderId) { 
+    public ConnectionHandler(Socket socket, UserManagement userManagement, OrderBook orderBook, CheckStopOrder checkStopOrder, StoricoOrdini storicoOrdini, AtomicInteger price, AtomicInteger orderId) { 
         this.socket = socket;
         this.userManagement = userManagement;
+        this.orderBook = orderBook;
+        this.checkStopOrder = checkStopOrder;
+        this.storicoOrdini = storicoOrdini;
         this.price = price;
         this.orderId = orderId;
         try {
