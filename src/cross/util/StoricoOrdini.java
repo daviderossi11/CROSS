@@ -46,10 +46,9 @@ public class StoricoOrdini {
         }
     }
 
-    public void addTrade(List<Order> trade) {
-        this.trades.addAll(trade);
+    public synchronized void addTrade(Order trade) {
+        trades.add(trade);
     }
-
 
     public List<Order> getPriceHistory(String MeseAnno) {
         /// MeseAnno deve essere nel formato "MMYYYY"

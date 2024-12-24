@@ -4,81 +4,76 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
-
 public class OrderBook implements Runnable {
-    private final  PriorityBlockingQueue<Order> Queue;
-    private final  TreeMap<Integer, PriorityQueue<Order>> buyOrders;
-    private final  TreeMap<Integer, PriorityQueue<Order>> sellOrders;
+    private final PriorityBlockingQueue<Order> queue;
+    private final ConcurrentSkipListMap<Integer, PriorityQueue<Order>> buyOrders;
+    private final ConcurrentSkipListMap<Integer, PriorityQueue<Order>> sellOrders;
     private final AtomicInteger currentPrice;
 
-    public OrderBook(PrioriryBlockingQueue<Order> Queue, AtomicInteger currentPrice) {
-        this.Queue = Queue;
+    public OrderBook(PriorityBlockingQueue<Order> queue, AtomicInteger currentPrice) {
+        this.queue = queue;
         this.currentPrice = currentPrice;
-        this.buyOrders = new TreeMap<>(Collections.reverseOrder());
-        this.sellOrders = new TreeMap<>();
-
+        this.buyOrders = new ConcurrentSkipListMap<>(Collections.reverseOrder());
+        this.sellOrders = new ConcurrentSkipListMap<>();
     }
 
+    @Override
     public void run() {
         while (true) {
             try {
-                Order order = Queue.take();
+                Order order = queue.take();
                 if (order.isAsk()) {
-                    processAsk(order);
+                    processOrder(order, buyOrders, false);
                 } else {
-                    processBid(order);
+                    processOrder(order, sellOrders, true);
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+                break;
             }
         }
     }
 
     public void addOrder(Order order) {
-        if (order.isAsk()) {
-            if(!sellOrders.containsKey(order.getPrice())) {
-                sellOrders.put(order.getPrice(), new PriorityQueue<>(Comparator.comparing(Order::getTimestamp)));
-            }else {
-                sellOrders.get(order.getPrice()).add(order);
-            }
-        } else {
-            if(!buyOrders.containsKey(order.getPrice())) {
-                buyOrders.put(order.getPrice(), new PriorityQueue<>(Comparator.comparing(Order::getTimestamp)));
-            }else {
-                buyOrders.get(order.getPrice()).add(order);
-            }
-        }
+        ConcurrentSkipListMap<Integer, PriorityQueue<Order>> targetMap = order.isAsk() ? sellOrders : buyOrders;
+        targetMap.computeIfAbsent(order.getPrice(), k -> new PriorityQueue<>(Comparator.comparing(Order::getTimestamp)))
+                 .add(order);
+    }
 
-        public void processAsk(Order order) {
-            while (!buyOrders.isEmpty() && buyOrders.firstKey() >= order.getPrice()) {
-                PriorityQueue<Order> orders = buyOrders.firstEntry().getValue();
-                while (!orders.isEmpty() && order.getSize() > 0) {
-                    Order buyOrder = orders.poll();
-                    if (buyOrder.getSize() > order.getSize()) {
-                        buyOrder.setSize(buyOrder.getSize() - order.getSize());
+    private void processOrder(Order order, ConcurrentSkipListMap<Integer, PriorityQueue<Order>> oppositeOrders, boolean isBuy) {
+        Iterator<Map.Entry<Integer, PriorityQueue<Order>>> iterator = oppositeOrders.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, PriorityQueue<Order>> entry = iterator.next();
+            if (order.isExecutable(entry.getKey())) {
+                PriorityQueue<Order> orderQueue = entry.getValue();
+                while (!orderQueue.isEmpty()) {
+                    Order matchedOrder = orderQueue.peek();
+                    if (matchedOrder.isExecutable(order.getPrice())) {
+                        int tradePrice = matchedOrder.getPrice();
+                        int tradeSize = Math.min(matchedOrder.getNotCoveredSize(), order.getNotCoveredSize());
+
+                        matchedOrder.setNotCoveredSize(matchedOrder.getNotCoveredSize() - tradeSize);
+                        order.setNotCoveredSize(order.getNotCoveredSize() - tradeSize);
+
+                        if (matchedOrder.getNotCoveredSize() == 0) {
+                            orderQueue.poll();
+                            // TODO: Implement trade notification for matchedOrder
+                        }
+
+                        currentPrice.set(tradePrice);
+
+                        if (order.getNotCoveredSize() == 0) {
+                            // TODO: Implement trade notification for order
+                            return;
+                        }
                     } else {
-                        order.setSize(order.getSize() - buyOrder.getSize());
+                        break;
                     }
                 }
-                if (orders.isEmpty()) {
-                    buyOrders.pollFirstEntry();
-                }
-            }
-            if (order.getSize() > 0) {
-                sellOrders.put(order.getPrice(), order);
+            } else {
+                break;
             }
         }
     }
-    
-
-
-
-
-
-
-
-
-
-
-
 }

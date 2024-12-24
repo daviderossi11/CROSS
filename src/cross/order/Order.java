@@ -8,6 +8,7 @@ public abstract class Order {
     private final int price;
     private final int size;
     private final long timestamp;
+    private int notCoveredSize;
 
 
     public Order(int orderId, String type, String orderType, int price, int size) {
@@ -35,8 +36,9 @@ public abstract class Order {
         return price;
     }
 
-    public int getSize() {
-        return size;
+    public int getNotCoveredSize() {
+        return notCoveredSize;
+
     }
 
     public long getTimestamp() {
@@ -51,5 +53,24 @@ public abstract class Order {
         return type.equals("bid");
     }
 
+    public void setNotCoveredSize() {
+        this.notCoveredSize = size;
+    }
+
+    public void setNotCoveredSize(int notCoveredSize) {
+        this.notCoveredSize = notCoveredSize;
+    }
+
+    public boolean isFullyCovered() {
+        return this.getNotCoveredSize() == 0;
+    }
+
+    public boolean isExecutable(int comparePrice) {
+        if(this.isAsk()){
+            return this.getPrice() <= comparePrice;
+        } else {
+            return this.getPrice() >= comparePrice;
+        }
+    }
     
 }
