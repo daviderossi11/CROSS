@@ -43,5 +43,13 @@ public abstract class Order {
         return timestamp;
     }
 
+    public boolean isAsk() {
+        return type.equals("ask");
+    }
+
+    public boolean isBid() {
+        return type.equals("bid");
+    }
+
     
 }
