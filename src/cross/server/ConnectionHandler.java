@@ -3,7 +3,6 @@ package cross.server;
 import java.io.*;
 import java.net.Socket;
 import com.google.gson.*;
-import cross.order.OrderBook;
 import cross.user.User;
 import cross.user.UserManagement;
 import cross.util.Session;
@@ -14,7 +13,6 @@ public class ConnectionHandler implements Runnable {
     private final BufferedReader in;
     private final PrintWriter out;
     private final UserManagement userManagement;
-    private final OrderBook orderBook;
     private User user;
     private Session session;
 

@@ -1,17 +1,20 @@
 package cross.order;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
 public abstract class Order {
-    private static final AtomicInteger orderIdGenerator = new AtomicInteger(0);
     private final int orderId;
     private final String type; // ask or bid
+    private final String orderType; // market, limit or stop
+    private final int price;
     private final int size;
     private final long timestamp;
 
-    public Order(String type, int size) {
-        this.orderId = orderIdGenerator.incrementAndGet();
+
+    public Order(int orderId, String type, String orderType, int price, int size) {
+        this.orderId = orderId;
         this.type = type;
+        this.orderType = orderType;
+        this.price = price;
         this.size = size;
         this.timestamp = System.currentTimeMillis();
     }
@@ -24,6 +27,14 @@ public abstract class Order {
         return type;
     }
 
+    public String getOrderType() {
+        return orderType;
+    }
+
+    public int getPrice() {
+        return price;
+    }
+
     public int getSize() {
         return size;
     }
@@ -31,7 +42,6 @@ public abstract class Order {
     public long getTimestamp() {
         return timestamp;
     }
-
 
     
 }

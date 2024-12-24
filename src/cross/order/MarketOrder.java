@@ -1,8 +1,9 @@
 package cross.order;
+
+
 public class MarketOrder extends Order {
-    public MarketOrder(String type, int size) {
-        super(type, size);
+    public MarketOrder(int orderId, String type, int price, int size) {
+        super(orderId, type, "market", price, size);
     }
-    
     
 }
