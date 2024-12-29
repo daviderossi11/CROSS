@@ -1,23 +1,26 @@
 package cross.order;
 
+import com.google.gson.annotations.Expose;
 
 public abstract class Order {
-    private final int orderId;
-    private final String type; // ask or bid
-    private final String orderType; // market, limit or stop
-    private final int price;
-    private final int size;
-    private final long timestamp;
-    private int notCoveredSize;
+    @Expose private final int orderId;
+    @Expose private final String type; // ask or bid
+    @Expose private final String orderType; // market, limit or stop
+    @Expose private final int price;
+    @Expose private int size;
+    @Expose private final long timestamp;
+    private final int userId;
 
 
-    public Order(int orderId, String type, String orderType, int price, int size) {
+
+    public Order(int orderId, String type, String orderType, int price, int size, long timestamp, int userId) {
         this.orderId = orderId;
         this.type = type;
         this.orderType = orderType;
         this.price = price;
         this.size = size;
-        this.timestamp = System.currentTimeMillis();
+        this.timestamp = timestamp;
+        this.userId = userId;
     }
 
     public int getOrderId() {
@@ -36,13 +39,17 @@ public abstract class Order {
         return price;
     }
 
-    public int getNotCoveredSize() {
-        return notCoveredSize;
-
-    }
 
     public long getTimestamp() {
         return timestamp;
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public int getSize() {
+        return size;
     }
 
     public boolean isAsk() {
@@ -53,24 +60,16 @@ public abstract class Order {
         return type.equals("bid");
     }
 
-    public void setNotCoveredSize() {
-        this.notCoveredSize = size;
-    }
-
-    public void setNotCoveredSize(int notCoveredSize) {
-        this.notCoveredSize = notCoveredSize;
-    }
-
-    public boolean isFullyCovered() {
-        return this.getNotCoveredSize() == 0;
-    }
-
     public boolean isExecutable(int comparePrice) {
         if(this.isAsk()){
             return this.getPrice() <= comparePrice;
         } else {
             return this.getPrice() >= comparePrice;
         }
+    }
+
+    public void reduceSize(int size) {
+        this.size -= size;
     }
     
 }

@@ -1,37 +1,40 @@
-package cross.server;
+package cross.handler;
 
 import java.io.*;
 import java.net.Socket;
 import com.google.gson.*;
 import cross.order.*;
+import cross.orderbook.*;
 import cross.user.*;
 import cross.util.*;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
-import java.util.concurrent.atomic.*;
 
 public class ConnectionHandler implements Runnable {
     
-    private AtomicInteger orderId;
-    private AtomicInteger price;
-
+    private final AtomicInteger orderId;
+    private final AtomicInteger currentPrice;
+    private int userId;
+    private final PriorityBlockingQueue<Order> OrderBookqueue;
     private final Socket socket;
     private final BufferedReader in;
     private final PrintWriter out;
-    private final UserManagement userManagement;
+    private final UserManager userManager;
     private final OrderBook orderBook;
     private final CheckStopOrder checkStopOrder;
     private final StoricoOrdini storicoOrdini;
-    private User user;
-    private Session session;
 
-    public ConnectionHandler(Socket socket, UserManagement userManagement, OrderBook orderBook, CheckStopOrder checkStopOrder, StoricoOrdini storicoOrdini, AtomicInteger price, AtomicInteger orderId) { 
+    public ConnectionHandler(Socket socket, UserManager userManager, OrderBook orderBook, CheckStopOrder checkStopOrder, StoricoOrdini storicoOrdini, AtomicInteger currentPrice, AtomicInteger orderId, PriorityBlockingQueue queue) {
         this.socket = socket;
-        this.userManagement = userManagement;
+        this.userManager = userManager;
         this.orderBook = orderBook;
         this.checkStopOrder = checkStopOrder;
-        this.storicoOrdini = storicoOrdini;
-        this.price = price;
+        this.currentPrice = currentPrice;
         this.orderId = orderId;
+        this.storicoOrdini = storicoOrdini;
+        this.OrderBookqueue = queue;
         try {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
@@ -44,7 +47,7 @@ public class ConnectionHandler implements Runnable {
     public void run(){
         Gson gson = new Gson();
         try {
-            while(socket.isConnected()){
+            while(socket.isConnected() && !Thread.currentThread().isInterrupted()) {
                 String request = in.readLine();
                 if (request == null) break;
 
@@ -57,12 +60,13 @@ public class ConnectionHandler implements Runnable {
                     case "login" -> {
                         String username = jsonRequest.get("username").getAsString();
                         String password = jsonRequest.get("password").getAsString();
-                        int responseCode = userManagement.login(username, password);
+                        int responseCode = userManager.login(username, password);
                         response.addProperty("code", responseCode);
                         switch (responseCode) {
                             case 100 -> {
-                                user = userManagement.getUser(username);
-                                session = new Session(user.getUserId(), socket.getInetAddress());
+                                userId = userManager.getUserId(username);
+                                Session session = new Session(socket.getInetAddress());
+                                userManager.addActiveUser(userId, session);
                                 response.addProperty("message", "Login successful");
                             }
                             case 101 -> response.addProperty("message", "username/password mismatch or user does not exist");
@@ -71,7 +75,7 @@ public class ConnectionHandler implements Runnable {
                         }
                     }
                     case "logout" -> {
-                        int logoutResponse = userManagement.logout(user.getUserId());
+                        int logoutResponse = userManager.logout(userId);
                         response.addProperty("code", logoutResponse);
                         switch (logoutResponse) {
                             case 100 -> response.addProperty("message", "Logout successful");
@@ -81,7 +85,7 @@ public class ConnectionHandler implements Runnable {
                     case "register" -> {
                         String username = jsonRequest.get("username").getAsString();
                         String password = jsonRequest.get("password").getAsString();
-                        int registerResponse = userManagement.register(username, password);
+                        int registerResponse = userManager.register(username, password);
                         response.addProperty("code", registerResponse);
                         switch (registerResponse) {
                             case 100 -> response.addProperty("message", "OK");
@@ -94,7 +98,7 @@ public class ConnectionHandler implements Runnable {
                         String username = jsonRequest.get("username").getAsString();
                         String oldPassword = jsonRequest.get("old_password").getAsString();
                         String newPassword = jsonRequest.get("new_password").getAsString();
-                        int updateResponse = userManagement.updateCredentials(username, oldPassword, newPassword);
+                        int updateResponse = userManager.updateCredentials(username, oldPassword, newPassword);
                         response.addProperty("code", updateResponse);
                         switch (updateResponse) {
                             case 100 -> response.addProperty("message", "OK");
@@ -105,6 +109,55 @@ public class ConnectionHandler implements Runnable {
                             default -> response.addProperty("message", "Other error cases");
                         }
                     }
+                    case "InsertLimitOrder" -> {
+                        int price = jsonRequest.get("price").getAsInt();
+                        int size = jsonRequest.get("size").getAsInt();
+                        String type = jsonRequest.get("type").getAsString();
+                        long timestamp = System.currentTimeMillis();
+                        Order order = new LimitOrder(orderId.incrementAndGet(), type, orderType, price, size, timestamp, userId);
+                        try {
+                            orderBook.addOrder(order);
+                            response.addProperty("orderId", order.getOrderId());
+                        } catch (Exception e) {
+                            response.addProperty("orderId", -1);
+                        }
+                    }
+                    case "InsertMarketOrder" -> {
+                        int size = jsonRequest.get("size").getAsInt();
+                        String type = jsonRequest.get("type").getAsString();
+                        long timestamp = System.currentTimeMillis();
+                        Order order = new MarketOrder(orderId.incrementAndGet(), type, orderType, currentPrice.get(), size, timestamp, userId);
+                        try {
+                            OrderBookqueue.add(order);
+                            response.addProperty("orderId", order.getOrderId());
+                        } catch (Exception e) {
+                            response.addProperty("orderId", -1);
+                        }
+                    }
+                    case "InsertStopOrder" -> {
+                        int price = jsonRequest.get("price").getAsInt();
+                        int size = jsonRequest.get("size").getAsInt();
+                        String type = jsonRequest.get("type").getAsString();
+                        long timestamp = System.currentTimeMillis();
+                        Order order = new StopOrder(orderId.incrementAndGet(), type, orderType, price, size, timestamp, userId);
+                        try {
+                            checkStopOrder.addOrder(order);
+                            response.addProperty("orderId", order.getOrderId());
+                        } catch (Exception e) {
+                            response.addProperty("orderId", -1);
+                        }
+                    }
+                    case "cancelOrder" -> {
+                        int order_id = jsonRequest.get("orderId").getAsInt();
+                        boolean canceled = orderBook.cancelOrder(order_id, userId) || checkStopOrder.cancelOrder(order_id, userId);
+                        response.addProperty("code", canceled ? 100 : 101);
+                        response.addProperty("message", canceled ? "Order canceled" : "Order not found");
+                    }
+                    case "getPriceHistory" -> {
+                        String MMMYYYY = jsonRequest.get("month").getAsString();
+                        response = storicoOrdini.getPriceHistory(MMMYYYY);   
+                    }
+
                     default -> {
                         response.addProperty("code", 400);
                         response.addProperty("message", "Unknown action");
@@ -113,13 +166,17 @@ public class ConnectionHandler implements Runnable {
                 out.println(gson.toJson(response));
             }
         } catch(IOException e){
-            System.err.println("Error: " + e);
-        } finally {
+            e.printStackTrace();
+        }finally {
             try {
+                in.close();
+                out.close();
                 socket.close();
             } catch (IOException e) {
-                System.err.println("Error: " + e);
+                e.printStackTrace();
             }
         }
+
     }
+
 }

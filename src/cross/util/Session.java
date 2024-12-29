@@ -2,48 +2,39 @@ package cross.util;
 
 import java.io.IOException;
 import java.net.*;
-import java.util.*;
 
 public class Session {
+    private final InetAddress ip;
+    private final int port = 5000;
     private DatagramSocket socket;
-    private final int userId;
-    private final ArrayList<Integer> activeOrders;
-    private final InetAddress address;
+    private String notification;
 
-    public Session(int userId, InetAddress address) {
-        this.userId = userId;
-        this.address = address;
-        this.activeOrders = new ArrayList<>();
 
+    public Session(InetAddress ip) {
+        this.ip = ip;
         try {
-            socket = new DatagramSocket();
+            this.socket = new DatagramSocket();
         } catch (SocketException e) {
-            System.err.println("Error creating socket: " + e.getMessage());
+           e.printStackTrace(); 
         }
     }
 
-    public int getUserId() {
-        return userId;
+    public void close() {
+        this.socket.close();
     }
 
-    public ArrayList<Integer> getActiveOrders() {
-        return activeOrders;
+    public void setNotification(String notification) {
+        this.notification = notification;
     }
 
-    public void addActiveOrder(int orderId) {
-        activeOrders.add(orderId);
-    }
-    
-    
-    public void sendNotification(String notification) {
-        byte[] buffer = notification.getBytes();
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, 1024);
+    public void sendNotification() {
         try {
+            byte[] buffer = notification.getBytes();
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length, ip, port);
             socket.send(packet);
         } catch (IOException e) {
-            System.err.println("Error sending notification: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    
 }
