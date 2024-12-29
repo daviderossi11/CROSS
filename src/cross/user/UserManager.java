@@ -10,7 +10,7 @@ import cross.util.Session;
 public class UserManager {
     private final CopyOnWriteArrayList<User> users;
     private final ConcurrentHashMap<Integer, Session> activeUsers;
-    private final String FILE_PATH = "../../files/Users.json";
+    private final String FILE_PATH = "files/Users.json";
     private final Gson gson;
 
     public UserManager() {
@@ -20,7 +20,11 @@ public class UserManager {
     }
 
     public void caricoUtenti() {
-        try (Reader reader = new FileReader(FILE_PATH)) {
+        File FILE = new File(FILE_PATH);
+        if (!FILE.exists()) {
+            return;
+        }
+        try (Reader reader = new FileReader(FILE)) {
             JsonElement jsonElement = JsonParser.parseReader(reader).getAsJsonObject();
             JsonObject jsonObject = jsonElement.getAsJsonObject();
             JsonArray jsonArray = jsonObject.getAsJsonArray("users");
@@ -40,6 +44,7 @@ public class UserManager {
             jsonArray.add(gson.toJsonTree(user));
         });
         jsonObject.add("users", jsonArray);
+        
         try (Writer writer = new FileWriter(FILE_PATH)) {
             gson.toJson(jsonObject, writer);
         } catch (IOException e) {

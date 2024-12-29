@@ -128,7 +128,7 @@ public class CheckStopOrder implements Runnable {
             jsonObject.add("sellOrders", sellOrdersArray);
         }
 
-        try (Writer writer = new FileWriter("checkstoporder.json")) {
+        try (Writer writer = new FileWriter("files/checkstoporder.json")) {
             gson.toJson(jsonObject, writer);
         } catch (IOException e) {
             e.printStackTrace();
@@ -136,7 +136,7 @@ public class CheckStopOrder implements Runnable {
     }
 
     public void caricaBook() {
-        File file = new File("checkstoporder.json");
+        File file = new File("files/checkstoporder.json");
         if (!file.exists()) return;
 
         try (Reader reader = new FileReader(file)) {

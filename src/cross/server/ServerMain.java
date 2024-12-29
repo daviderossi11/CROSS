@@ -5,14 +5,17 @@ import cross.order.*;
 import cross.orderbook.*;
 import cross.user.*;
 import cross.util.*;
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
 public class ServerMain {
 
+    // Configurazioni e risorse condivise
     private static int PORT;
     private static int THREAD_POOL_SIZE;
     private static int inactivityTimeout;
@@ -20,9 +23,19 @@ public class ServerMain {
 
     private static volatile boolean running = true;
 
+    private static ScheduledExecutorService savingService;
+    private static ExecutorService threadPool;
+    private static ExecutorService HandlerThreadPool;
+    private static PriorityBlockingQueue<Order> orderQueue;
+    private static PriorityBlockingQueue<Session> notificationQueue;
+    private static StoricoOrdini storicoOrdini;
+    private static UserManager userManager;
+    private static AtomicInteger currentPrice;
+    private static AtomicInteger orderId;
+
     public static void main(String[] args) {
 
-        // Load Config
+        // Carica configurazione
         try {
             Properties config = ReadConfig("server.properties");
             PORT = Integer.parseInt(config.getProperty("port", "8080"));
@@ -36,136 +49,139 @@ public class ServerMain {
             System.exit(-1);
         }
 
-        // Thread Pool and Queues
-        ScheduledExecutorService savingService = Executors.newScheduledThreadPool(1);
-        ExecutorService threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
-        ExecutorService HandlerThreadPool = Executors.newFixedThreadPool(3);
-        PriorityBlockingQueue<Order> orderQueue = new PriorityBlockingQueue<>();
-        PriorityBlockingQueue<Session> notificationQueue = new PriorityBlockingQueue<>();
+        // Inizializza risorse
+        savingService = Executors.newScheduledThreadPool(1);
+        threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        HandlerThreadPool = Executors.newFixedThreadPool(3);
+        orderQueue = new PriorityBlockingQueue<>();
+        notificationQueue = new PriorityBlockingQueue<>();
 
-        // Order Book and Handlers
-        StoricoOrdini storicoOrdini = new StoricoOrdini();
-        AtomicInteger currentPrice = new AtomicInteger(storicoOrdini.getLastPrice());
-        AtomicInteger orderId = new AtomicInteger(storicoOrdini.getOrderid());
+        storicoOrdini = new StoricoOrdini();
+        currentPrice = new AtomicInteger(storicoOrdini.getLastPrice());
+        orderId = new AtomicInteger(storicoOrdini.getOrderid());
 
-
-        // User Management
-        UserManager userManager = new UserManager();
+        userManager = new UserManager();
         userManager.caricoUtenti();
-
 
         OrderBook orderBook = new OrderBook(orderQueue, currentPrice, notificationQueue, storicoOrdini, userManager);
         CheckStopOrder checkStopOrder = new CheckStopOrder(orderQueue, currentPrice);
 
-        // Save Data
-
+        // Salvataggio periodico
         savingService.scheduleAtFixedRate(() -> {
             System.out.println("Saving data...");
             storicoOrdini.SalvaOrdini();
             userManager.salvaUtenti();
         }, saveTime, saveTime, TimeUnit.SECONDS);
 
-
-        // Notification Handler
+        // Handler delle notifiche
         NotificationHandler notificationHandler = new NotificationHandler(notificationQueue);
 
-        // Start Handlers
+        // Avvio thread di gestione
         HandlerThreadPool.execute(notificationHandler);
         HandlerThreadPool.execute(orderBook);
         HandlerThreadPool.execute(checkStopOrder);
 
-        // Start Server Socket
+        // Avvio del server
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Server started on port " + PORT);
 
-            // Main Server Loop
             while (running) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("New connection accepted.");
+                try {
+                    Socket clientSocket = serverSocket.accept();
+                    System.out.println("New connection accepted.");
 
-                clientSocket.setSoTimeout(inactivityTimeout * 1000);
+                    clientSocket.setSoTimeout(inactivityTimeout * 1000);
 
-                // Create and execute a connection handler
-                ConnectionHandler handler = new ConnectionHandler(
-                        clientSocket,
-                        userManager,
-                        orderBook,
-                        checkStopOrder,
-                        storicoOrdini,
-                        currentPrice,
-                        orderId,
-                        orderQueue
-                );
-                threadPool.execute(handler);
+                    ConnectionHandler handler = new ConnectionHandler(
+                            clientSocket,
+                            userManager,
+                            orderBook,
+                            checkStopOrder,
+                            storicoOrdini,
+                            currentPrice,
+                            orderId,
+                            orderQueue
+                    );
+                    threadPool.execute(handler);
+                } catch (IOException e) {
+                    System.err.println("Error accepting client connection: " + e.getMessage());
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            shutdownServer(threadPool, HandlerThreadPool, savingService, orderQueue, notificationQueue, storicoOrdini, userManager);
         }
     }
 
-    private static void shutdownServer(ExecutorService pool, ExecutorService HandlerPool, ScheduledExecutorService savingService, PriorityBlockingQueue<Order> orderQueue, PriorityBlockingQueue<Session> notificationQueue, StoricoOrdini storicoOrdini, UserManager userManager) {
+    // Shutdown Hook
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutdown hook triggered.");
+            running = false;
+            shutdownServer(threadPool, HandlerThreadPool, savingService, orderQueue, notificationQueue, storicoOrdini, userManager);
+            System.out.println("Server shutdown complete.");
+        }));
+    }
+
+    // Metodo di arresto sicuro
+    private static void shutdownServer(
+            ExecutorService pool,
+            ExecutorService handlerPool,
+            ScheduledExecutorService savingService,
+            PriorityBlockingQueue<Order> orderQueue,
+            PriorityBlockingQueue<Session> notificationQueue,
+            StoricoOrdini storicoOrdini,
+            UserManager userManager
+    ) {
         System.out.println("Shutting down server...");
-        running = false;
 
-        // Shutdown Connection Handlers
-
+        // Arresto dei thread pool
         pool.shutdown();
         try {
-            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+            if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
                 pool.shutdownNow();
             }
         } catch (InterruptedException e) {
             pool.shutdownNow();
         }
+
+        handlerPool.shutdown();
+        try {
+            if (!handlerPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                handlerPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            handlerPool.shutdownNow();
+        }
+
         savingService.shutdown();
         try {
-            if (!savingService.awaitTermination(10, TimeUnit.SECONDS)) {
+            if (!savingService.awaitTermination(5, TimeUnit.SECONDS)) {
                 savingService.shutdownNow();
             }
         } catch (InterruptedException e) {
             savingService.shutdownNow();
         }
-        HandlerPool.shutdown();
-        try {
-            if (!HandlerPool.awaitTermination(10, TimeUnit.SECONDS)) {
-                HandlerPool.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            HandlerPool.shutdownNow();
-        }
 
-
-        // Save Data
+        // Salvataggio finale dei dati
         System.out.println("Saving data...");
         storicoOrdini.SalvaOrdini();
         userManager.salvaUtenti();
 
-        // Shutdown Order Book
+        // Pulizia delle code e delle risorse
         orderQueue.clear();
         notificationQueue.clear();
         storicoOrdini.clear();
         userManager.clear();
 
-        System.out.println("Server shutdown complete.");
-
-    
-    }
-    // Graceful Termination Handler
-    static {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutdown hook triggered.");
-            running = false;
-        }));
+        System.out.println("Shutdown process completed.");
     }
 
-    
+    // Metodo per leggere i file di configurazione
     public static Properties ReadConfig(String fileName) throws IOException {
-    Properties properties = new Properties();
-    try (FileReader reader = new FileReader(fileName)) {
-        properties.load(reader);
+        Properties properties = new Properties();
+        try (FileReader reader = new FileReader(fileName)) {
+            properties.load(reader);
         }
-    return properties;
+        return properties;
     }
 }

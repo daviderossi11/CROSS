@@ -8,7 +8,7 @@ import java.io.*;
 import java.util.stream.Collectors;
 
 public class StoricoOrdini {
-    private final String FILE_PATH = "../../files/storicoOrdini.json";
+    private final String FILE_PATH = "files/storicoOrdini.json";
     private final List<Order> trades;
     private final Gson gson;
 
@@ -19,7 +19,14 @@ public class StoricoOrdini {
     }
 
     private synchronized  void caricaStorico() {
-        try(Reader reader = new FileReader(FILE_PATH)) {
+
+        File FILE = new File(FILE_PATH);
+
+        if (!FILE.exists()) {
+            return;
+        }
+
+        try(Reader reader = new FileReader(FILE)) {
             JsonElement jsonElement = JsonParser.parseReader(reader).getAsJsonObject();
             JsonObject jsonObject = jsonElement.getAsJsonObject();
             JsonArray jsonArray = jsonObject.getAsJsonArray("trades");

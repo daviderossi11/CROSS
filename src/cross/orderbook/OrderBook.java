@@ -33,32 +33,32 @@ public class OrderBook implements Runnable {
     @Override
     public void run() {
         caricaBook();
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
-                Order order = queue.take();
+        try {
+            while (!Thread.currentThread().isInterrupted()) {
+                // Blocca il thread finché non c'è un elemento disponibile
+                Order order = queue.take(); // Blocca finché la coda non ha un elemento
+
+                // Processa l'ordine
                 if (order.isAsk()) {
                     processOrder(order, buyOrders, false);
                 } else {
                     processOrder(order, sellOrders, true);
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
             }
-            while(!queue.isEmpty()) {
-                Order order = queue.poll();
-                addOrder(order);
-            }
+        } catch (InterruptedException e) {
+            // Interruzione pulita del thread
+            Thread.currentThread().interrupt();
+        } finally {
+            // Salvataggio finale prima della chiusura
             salvaBook();
         }
     }
 
     public synchronized void addOrder(Order order) {
         ConcurrentSkipListMap<Integer, PriorityQueue<Order>> targetMap = order.isAsk() ? sellOrders : buyOrders;
-        synchronized (targetMap) {
-            targetMap.computeIfAbsent(order.getPrice(), k -> new PriorityQueue<>(Comparator.comparing(Order::getTimestamp)))
-                     .add(order);
-        }
+        
+        targetMap.computeIfAbsent(order.getPrice(), k -> new PriorityQueue<>(Comparator.comparing(Order::getTimestamp)))
+                    .add(order);
     }
 
     private void processOrder(Order order, ConcurrentSkipListMap<Integer, PriorityQueue<Order>> oppositeOrders, boolean isBuy) {
@@ -246,7 +246,7 @@ public class OrderBook implements Runnable {
             jsonObject.add("sellOrders", sellOrdersArray);
         }
 
-        try (Writer writer = new FileWriter("orderbook.json")) {
+        try (Writer writer = new FileWriter("files/orderbook.json")) {
             gson.toJson(jsonObject, writer);
         } catch (IOException e) {
             e.printStackTrace();
@@ -254,7 +254,7 @@ public class OrderBook implements Runnable {
     }
 
     public void caricaBook() {
-        File file = new File("orderbook.json");
+        File file = new File("files/orderbook.json");
         if (!file.exists()) {
             return;
         }

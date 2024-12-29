@@ -24,7 +24,7 @@ public class ConnectionHandler implements Runnable {
     private final CheckStopOrder checkStopOrder;
     private final StoricoOrdini storicoOrdini;
 
-    public ConnectionHandler(Socket socket, UserManager userManager, OrderBook orderBook, CheckStopOrder checkStopOrder, StoricoOrdini storicoOrdini, AtomicInteger currentPrice, AtomicInteger orderId, PriorityBlockingQueue queue) {
+    public ConnectionHandler(Socket socket, UserManager userManager, OrderBook orderBook, CheckStopOrder checkStopOrder, StoricoOrdini storicoOrdini, AtomicInteger currentPrice, AtomicInteger orderId, PriorityBlockingQueue<Order> queue) {
         this.socket = socket;
         this.userManager = userManager;
         this.orderBook = orderBook;
@@ -112,7 +112,7 @@ public class ConnectionHandler implements Runnable {
                         int size = jsonRequest.get("size").getAsInt();
                         String type = jsonRequest.get("type").getAsString();
                         long timestamp = System.currentTimeMillis();
-                        Order order = new LimitOrder(orderId.incrementAndGet(), type, orderType, price, size, timestamp, userId);
+                        Order order = new LimitOrder(orderId.incrementAndGet(), type, price, size, timestamp, userId);
                         try {
                             orderBook.addOrder(order);
                             response.addProperty("orderId", order.getOrderId());
@@ -124,7 +124,7 @@ public class ConnectionHandler implements Runnable {
                         int size = jsonRequest.get("size").getAsInt();
                         String type = jsonRequest.get("type").getAsString();
                         long timestamp = System.currentTimeMillis();
-                        Order order = new MarketOrder(orderId.incrementAndGet(), type, orderType, currentPrice.get(), size, timestamp, userId);
+                        Order order = new MarketOrder(orderId.incrementAndGet(), type, currentPrice.get(), size, timestamp, userId);
                         try {
                             OrderBookqueue.add(order);
                             response.addProperty("orderId", order.getOrderId());
@@ -137,7 +137,7 @@ public class ConnectionHandler implements Runnable {
                         int size = jsonRequest.get("size").getAsInt();
                         String type = jsonRequest.get("type").getAsString();
                         long timestamp = System.currentTimeMillis();
-                        Order order = new StopOrder(orderId.incrementAndGet(), type, orderType, price, size, timestamp, userId);
+                        Order order = new StopOrder(orderId.incrementAndGet(), type, price, size, timestamp, userId);
                         try {
                             checkStopOrder.addOrder(order);
                             response.addProperty("orderId", order.getOrderId());

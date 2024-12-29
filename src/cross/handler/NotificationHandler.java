@@ -20,5 +20,5 @@ public class NotificationHandler implements Runnable {
                 Thread.currentThread().interrupt();
             }
         }
-    
+    }
 }

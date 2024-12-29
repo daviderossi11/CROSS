@@ -74,7 +74,7 @@ public class ClientMain {
                             request.addProperty("old_password", oldPassword);
                             request.addProperty("new_password", newPassword);
                         }
-                        case "insertLimitOrder", "insertMarketOrder", "insertStopOrder" -> {
+                        case "InsertLimitOrder", "InsertMarketOrder", "InsertStopOrder" -> {
                             if (!isLoggedIn) {
                                 System.out.println("You must be logged in to perform this action.");
                                 continue;
@@ -100,7 +100,7 @@ public class ClientMain {
                             request.addProperty("type", type);
                             request.addProperty("size", size);
                             
-                            if (!action.equals("insertMarketOrder")) {
+                            if (!action.equals("InsertMarketOrder")) {
                                 System.out.println("Enter price: ");
                                 int price = scanner.nextInt();
                                 scanner.nextLine(); // Clear buffer
