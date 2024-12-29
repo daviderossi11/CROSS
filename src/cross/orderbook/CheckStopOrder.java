@@ -67,7 +67,7 @@ public class CheckStopOrder implements Runnable {
         }
     }
 
-    public void addOrder(Order order) {
+    public synchronized void addOrder(Order order) {
         ConcurrentSkipListMap<Integer, PriorityQueue<Order>> targetMap = order.isAsk() ? sellOrders : buyOrders;
         synchronized (targetMap) {
             targetMap.computeIfAbsent(order.getPrice(), k -> new PriorityQueue<>(Comparator.comparing(Order::getTimestamp)))

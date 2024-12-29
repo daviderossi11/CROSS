@@ -6,6 +6,7 @@ import java.util.Properties;
 import java.util.Scanner;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 public class ClientMain {
@@ -120,6 +121,25 @@ public class ClientMain {
                             String monthYear = scanner.nextLine();
                             request.addProperty("action", "getPriceHistory");
                             request.addProperty("monthYear", monthYear);
+
+                            out.println(gson.toJson(request)); // Send request to server
+                            String response = in.readLine();
+                            JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
+
+                            if (jsonResponse.has("error") && jsonResponse.get("error").getAsInt() == -1) { // Check error
+                                System.out.println("Data not available for the selected month.");
+                            } else { // Display received data
+                                System.out.println("Price history received:");
+                                JsonArray data = jsonResponse.getAsJsonArray("data");
+                                data.forEach(item -> {
+                                    JsonObject entry = item.getAsJsonObject();
+                                    System.out.println("Date: " + entry.get("date").getAsString());
+                                    System.out.println("Open: " + entry.get("openPrice").getAsInt());
+                                    System.out.println("Close: " + entry.get("closePrice").getAsInt());
+                                    System.out.println("High: " + entry.get("maxPrice").getAsInt());
+                                    System.out.println("Low: " + entry.get("minPrice").getAsInt());
+                                });
+                            }
                         }
                         case "cancelOrder" -> {
                             if (!isLoggedIn) {

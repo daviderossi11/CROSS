@@ -9,8 +9,6 @@ import cross.user.*;
 import cross.util.*;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.*;
-
 
 public class ConnectionHandler implements Runnable {
     
@@ -155,9 +153,15 @@ public class ConnectionHandler implements Runnable {
                     }
                     case "getPriceHistory" -> {
                         String MMMYYYY = jsonRequest.get("month").getAsString();
-                        response = storicoOrdini.getPriceHistory(MMMYYYY);   
-                    }
+                        JsonObject history = storicoOrdini.getPriceHistory(MMMYYYY);
 
+                        if (history.has("error")) { // Controlla se c'è un errore
+                            response.addProperty("error", -1);
+                            response.addProperty("message", "Dati non disponibili per il mese selezionato.");
+                        } else {
+                            response = history; // Invia i dati storici dettagliati
+                        }
+                    }
                     default -> {
                         response.addProperty("code", 400);
                         response.addProperty("message", "Unknown action");
