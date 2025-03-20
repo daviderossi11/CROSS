@@ -1,1 +1,32 @@
-{"users":[{"userId":1,"username":"davide","password":"davide11"}]}
+{
+  "users": [
+    {
+      "username": "zio",
+      "password": "zioziozio"
+    },
+    {
+      "username": "sucamilla",
+      "password": "cazzopalle"
+    },
+    {
+      "username": "davide",
+      "password": "davide11"
+    },
+    {
+      "username": "lello",
+      "password": "lelloten"
+    },
+    {
+      "username": "marco",
+      "password": "marcopolo"
+    },
+    {
+      "username": "pina",
+      "password": "ziapina1"
+    },
+    {
+      "username": "pippo",
+      "password": "pippotanto"
+    }
+  ]
+}

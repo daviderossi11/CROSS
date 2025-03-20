@@ -1,190 +1,89 @@
 package cross.client;
 
-import java.io.*;
-import java.net.*;
+import java.net.Socket;
+import java.net.DatagramSocket;
 import java.util.Properties;
-import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+
+import cross.client.utils.*;
+
+import java.io.*;
 
 public class ClientMain {
+    private static ServerListener serverListener;
+    private static ExecutorService threadPool;
+
     public static void main(String[] args) {
+        new ClientMain().startClient();
+    }
+
+    public void startClient() {
+        SyncConsole.print("Client running...");
+
+        // Carica configurazione
+        Properties config = ReadConfig("config/client.properties");
+        String SERVER = config.getProperty("SERVER", "localhost");
+        int UDP_PORT = Integer.parseInt(config.getProperty("UDP_PORT", "8081"));
+        int SERVER_PORT = Integer.parseInt(config.getProperty("SERVER_PORT", "8080"));
+
+        threadPool = Executors.newFixedThreadPool(2);
+
         try {
-            Properties config = ReadConfig("client.properties");
-            String host = config.getProperty("host", "localhost");
-            int port = Integer.parseInt(config.getProperty("port", "8080"));
+            System.out.println("Connecting to server...");
 
-            UdpHandler udpHandler = new UdpHandler();
-            Thread notificationThread = new Thread(udpHandler);
-            notificationThread.start();
+            // Crea la connessione TCP
+            Socket tcpSocket = new Socket(SERVER, SERVER_PORT);
 
-            try (Socket socket = new Socket(host, port);
-                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                 Scanner scanner = new Scanner(System.in)) {
+            // Crea la connessione UDP
+            DatagramSocket udpSocket = new DatagramSocket(UDP_PORT);
+            UDP_PORT = udpSocket.getLocalPort();
 
-                Gson gson = new Gson();
-                boolean isLoggedIn = false;
-                while (true) {
-                    System.out.println("Choose action or type 'exit' to quit: ");
-                    String action = scanner.nextLine();
+            // Avvia la SocketTCP
+            SocketTCP socketTCP = new SocketTCP(tcpSocket, UDP_PORT);
+            threadPool.execute(socketTCP);
 
-                    if ("exit".equalsIgnoreCase(action)) {
-                        System.out.println("Exiting client...");
-                        break;
-                    }
-
-                    udpHandler.saveConsoleOutput("> " + action + "\n");
-                    JsonObject request = new JsonObject();
-
-                    switch (action) {
-                        case "register" -> {
-                            System.out.println("Enter username: ");
-                            String regUsername = scanner.nextLine();
-                            System.out.println("Enter password: ");
-                            String regPassword = scanner.nextLine();
-                            request.addProperty("action", "register");
-                            request.addProperty("username", regUsername);
-                            request.addProperty("password", regPassword);
-                        }
-                        case "login" -> {
-                            System.out.println("Enter username: ");
-                            String logUsername = scanner.nextLine();
-                            System.out.println("Enter password: ");
-                            String logPassword = scanner.nextLine();
-                            request.addProperty("action", "login");
-                            request.addProperty("username", logUsername);
-                            request.addProperty("password", logPassword);
-                        }
-                        case "logout" -> {
-                            request.addProperty("action", "logout");
-                            isLoggedIn = false;
-                        }
-                        case "updateCredentials" -> {
-                            System.out.println("Enter username: ");
-                            String username = scanner.nextLine();
-                            System.out.println("Enter current password: ");
-                            String oldPassword = scanner.nextLine();
-                            System.out.println("Enter new password: ");
-                            String newPassword = scanner.nextLine();
-                            request.addProperty("action", "updateCredentials");
-                            request.addProperty("username", username);
-                            request.addProperty("old_password", oldPassword);
-                            request.addProperty("new_password", newPassword);
-                        }
-                        case "InsertLimitOrder", "InsertMarketOrder", "InsertStopOrder" -> {
-                            if (!isLoggedIn) {
-                                System.out.println("You must be logged in to perform this action.");
-                                continue;
-                            }
-                            System.out.println("Enter type (ask/bid): ");
-                            String type = scanner.nextLine();
-
-                            if (!type.equals("ask") && !type.equals("bid")) {
-                                System.out.println("Invalid type. Must be 'ask' or 'bid'.");
-                                continue;
-                            }
-
-                            System.out.println("Enter size: ");
-                            int size = scanner.nextInt();
-                            scanner.nextLine(); // Clear buffer
-
-                            if (size <= 0 || size >= Integer.MAX_VALUE) {
-                                System.out.println("Invalid size. Must be > 0 and < 2^31.");
-                                continue;
-                            }
-
-                            request.addProperty("action", action);
-                            request.addProperty("type", type);
-                            request.addProperty("size", size);
-                            
-                            if (!action.equals("InsertMarketOrder")) {
-                                System.out.println("Enter price: ");
-                                int price = scanner.nextInt();
-                                scanner.nextLine(); // Clear buffer
-
-                                if (price <= 0 || price >= Integer.MAX_VALUE) {
-                                    System.out.println("Invalid price. Must be > 0 and < 2^31.");
-                                    continue;
-                                }
-                                request.addProperty("price", price);
-                            }
-                        }
-                        case "getPriceHistory" -> {
-                            if (!isLoggedIn) {
-                                System.out.println("You must be logged in to perform this action.");
-                                continue;
-                            }
-                            System.out.println("Enter month and year (MMYYYY): ");
-                            String monthYear = scanner.nextLine();
-                            request.addProperty("action", "getPriceHistory");
-                            request.addProperty("monthYear", monthYear);
-
-                            out.println(gson.toJson(request)); // Send request to server
-                            String response = in.readLine();
-                            JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
-
-                            if (jsonResponse.has("error") && jsonResponse.get("error").getAsInt() == -1) { // Check error
-                                System.out.println("Data not available for the selected month.");
-                            } else { // Display received data
-                                System.out.println("Price history received:");
-                                JsonArray data = jsonResponse.getAsJsonArray("data");
-                                data.forEach(item -> {
-                                    JsonObject entry = item.getAsJsonObject();
-                                    System.out.println("Date: " + entry.get("date").getAsString());
-                                    System.out.println("Open: " + entry.get("openPrice").getAsInt());
-                                    System.out.println("Close: " + entry.get("closePrice").getAsInt());
-                                    System.out.println("High: " + entry.get("maxPrice").getAsInt());
-                                    System.out.println("Low: " + entry.get("minPrice").getAsInt());
-                                });
-                            }
-                        }
-                        case "cancelOrder" -> {
-                            if (!isLoggedIn) {
-                                System.out.println("You must be logged in to perform this action.");
-                                continue;
-                            }
-                            System.out.println("Enter order ID: ");
-                            int orderId = scanner.nextInt();
-                            scanner.nextLine(); // Clear buffer
-                            request.addProperty("action", "cancelOrder");
-                            request.addProperty("orderId", orderId);
-                        }
-                        default -> {
-                            System.out.println("Invalid action. Please try again.");
-                            continue;
-                        }
-                    }
-
-                    out.println(gson.toJson(request));
-                    String response = in.readLine();
-                    System.out.println("Server response: " + response);
-
-                    if (action.equals("login")) {
-                        JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
-                        if (jsonResponse.get("code").getAsInt() == 100) {
-                            isLoggedIn = true;
-                        }
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                udpHandler.stop();
-                System.out.println("Client terminated.");
-            }
+            // Avvia il ServerListener che ora gestisce sia TCP che UDP
+            serverListener = new ServerListener(socketTCP, udpSocket);
+            threadPool.execute(serverListener);
+            
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static Properties ReadConfig(String fileName) throws IOException {
-        Properties properties = new Properties();
-        try (FileReader reader = new FileReader(fileName)) {
-            properties.load(reader);
+    // shutdown Thread
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            SyncConsole.print("Client closing...");
+            shutdown();
+            SyncConsole.print("Client closed.");
+        }));
+    }
+
+    // shutdown method
+    public static void shutdown() {
+        if (serverListener != null) serverListener.shutdown();
+        threadPool.shutdown();
+        try {
+            if (!threadPool.awaitTermination(800, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                threadPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            threadPool.shutdownNow();
         }
-        return properties;
+    }
+
+
+    // Legge il file di configurazione
+    public static Properties ReadConfig(String filename) {
+        Properties config = new Properties();
+        try {
+            config.load(new FileReader(filename));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return config;
     }
 }
