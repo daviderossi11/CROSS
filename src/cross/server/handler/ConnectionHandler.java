@@ -363,7 +363,7 @@ public class ConnectionHandler implements Runnable{
             if (sock != null && !sock.isClosed()) {
                 sock.close();
             }
-            System.out.println("Connessione chiusa con " + IP);
+            System.out.println("Connessione chiusa con " + IP.getHostAddress());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -386,17 +386,17 @@ public class ConnectionHandler implements Runnable{
         } catch (SocketException e) {
             e.printStackTrace();
         }
-        System.out.println("Connessione stabilita con " + IP.getHostAddress() + " sulla porta UDP " + UDP_PORT);
+        System.out.println("Connessione stabilita con " + IP.getHostAddress() + ":" + sock.getPort() + " sulla porta UDP " + UDP_PORT); 
         while (running.get() && !sock.isClosed()) {
             try {
                 String req = in.readLine();
                 if (req == null) {
-                    System.out.println("Connessione chiusa da " + IP);
+                    System.out.println("Connessione chiusa da " + IP.getHostAddress());
                     break;
                 }
                 handleRequest(req);
             } catch (SocketTimeoutException e){
-                System.out.println("Timeout scaduto per la connessione con " + IP);
+                System.out.println("Timeout scaduto per la connessione con " + IP.getHostAddress());
                 break;
             } catch (IOException e) {
                 e.printStackTrace();

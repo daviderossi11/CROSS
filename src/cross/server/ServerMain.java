@@ -103,7 +103,7 @@ public class ServerMain {
 
             // Avvio il scoket del server
             serverSocket = new ServerSocket(PORT, MAX_CLIENTS, InetAddress.getByName(HOST)); 
-            System.out.println("Server started on " + HOST + ":" + PORT);
+            System.out.println("Server started on " + InetAddress.getByName(HOST).getHostAddress() + ":" + PORT);
 
             while (running.get()) {
                 try {

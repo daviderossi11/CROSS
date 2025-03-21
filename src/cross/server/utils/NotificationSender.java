@@ -24,8 +24,6 @@ public class NotificationSender {
     public synchronized void sendNotification(List<Trade> Trades, InetAddress IP, int port) {
         String Notification = createNotification(Trades);
         byte[] buffer = Notification.getBytes();
-
-        System.out.println("Sending notification to " + IP + ":" + port);
         try (DatagramSocket Socket = new DatagramSocket()) {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length, IP, port);
             Socket.send(packet);

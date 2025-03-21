@@ -100,18 +100,20 @@ public class StoricoOrdiniHandler {
     
         JsonArray dailyData = new JsonArray();
     
-        for (Map.Entry<String, List<Integer>> entry : dailyPrices.entrySet()) {
+        dailyPrices.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> {
             List<Integer> prices = entry.getValue();
-    
+        
             // Se la lista è vuota, non aggiungere questo giorno
-            if (prices.isEmpty()) continue;
-    
+            if (prices.isEmpty()) return;
+        
             // Calcola i prezzi minimi e massimi in modo più efficiente
             int minPrice = Collections.min(prices);
             int maxPrice = Collections.max(prices);
             int openPrice = prices.get(0); // Primo prezzo registrato nel giorno
             int closePrice = prices.get(prices.size() - 1); // Ultimo prezzo registrato nel giorno
-    
+        
             JsonObject daily = new JsonObject();
             daily.addProperty("date", entry.getKey());
             daily.addProperty("minPrice", minPrice);
@@ -119,7 +121,7 @@ public class StoricoOrdiniHandler {
             daily.addProperty("openPrice", openPrice);
             daily.addProperty("closePrice", closePrice);
             dailyData.add(daily);
-        }
+            });
     
         // Se non ci sono dati per il mese, restituire un JSON con valori a -1
         if (dailyData.size() == 0) {

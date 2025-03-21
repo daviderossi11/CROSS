@@ -2,6 +2,7 @@ package cross.client;
 
 import java.net.Socket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,7 +21,6 @@ public class ClientMain {
     }
 
     public void startClient() {
-        SyncConsole.print("Client running...");
 
         // Carica configurazione
         Properties config = ReadConfig("config/client.properties");
@@ -31,7 +31,6 @@ public class ClientMain {
         threadPool = Executors.newFixedThreadPool(2);
 
         try {
-            System.out.println("Connecting to server...");
 
             // Crea la connessione TCP
             Socket tcpSocket = new Socket(SERVER, SERVER_PORT);
@@ -47,6 +46,8 @@ public class ClientMain {
             // Avvia il ServerListener che ora gestisce sia TCP che UDP
             serverListener = new ServerListener(socketTCP, udpSocket);
             threadPool.execute(serverListener);
+
+            SyncConsole.print("> Connessione Avviata con il server " + InetAddress.getByName(SERVER).getHostAddress() + " sulla porta " + SERVER_PORT);
             
         } catch (IOException e) {
             e.printStackTrace();
@@ -56,9 +57,7 @@ public class ClientMain {
     // shutdown Thread
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            SyncConsole.print("Client closing...");
             shutdown();
-            SyncConsole.print("Client closed.");
         }));
     }
 

@@ -347,7 +347,6 @@ public class SocketTCP implements Runnable {
     @Override
     public void run() {
         out.println(UDP_PORT); //invio la porta UDP al server
-        System.out.println("> Connessione TCP avviata.");
         while (running && !sock.isClosed()) {
             try {
                 JsonObject request = getRequest();
