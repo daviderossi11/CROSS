@@ -50,10 +50,10 @@ public class UserManager {
     public void saveUsers() {
         JsonObject jsonObject = new JsonObject();
         JsonArray jsonArray = new JsonArray();
-        users.forEach((_, user) -> {
+        users.values().forEach(user -> {
             jsonArray.add(gson.toJsonTree(user));
         });
-        jsonObject.add("users", jsonArray);
+        jsonObject.add("users", jsonArray);        
         
         try (Writer writer = new FileWriter(path)) {
             gson.toJson(jsonObject, writer);
